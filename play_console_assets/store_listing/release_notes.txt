@@ -1,0 +1,19 @@
+<en-US>
+Initial Release of VoiceLetter AI v1.0:
+• Speak naturally to craft professional, executive-formatted letters in seconds.
+• Multilingual support for Hindi, English, and major Indian & global languages.
+• Hands-free voice editing (e.g., "Make subject bold", "Translate into Hindi", "Replace Monday with Tuesday").
+• Authentic A4 document canvas with custom margins, typography, and line spacing.
+• Export to PDF, DOCX (Microsoft Word), and TXT with wireless printing and direct sharing.
+• Preloaded template catalog for School, Bank, Office, Job, and Civic letters.
+</en-US>
+
+<hi-IN>
+VoiceLetter AI v1.0 का पहला रिलीज़:
+• बोलकर सेकंडों में प्रोफेशनल और फॉर्मेटेड पत्र बनाएं।
+• हिंदी, अंग्रेजी और सभी प्रमुख भारतीय भाषाओं का समर्थन।
+• वॉइस कमांड से सीधे बदलाव (जैसे "सब्जेक्ट बोल्ड करो", "हिंदी में अनुवाद करो")।
+• A4 पेज लेआउट, मार्जिन और फॉन्ट कस्टमाइजेशन।
+• PDF, DOCX (Word) और TXT में एक्सपोर्ट, प्रिंट और शेयर करें।
+• स्कूल, बैंक, ऑफिस, नौकरी और शिकायतों के लिए रेडीमेड टेम्पलेट्स।
+</hi-IN>

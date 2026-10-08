@@ -1,0 +1,33 @@
+========================================================================
+GOOGLE PLAY CONSOLE - DATA SAFETY DECLARATION GUIDANCE
+========================================================================
+
+1. Data Collection and Sharing Overview:
+   - Does your app collect or share any of the required user data types?
+     -> YES (Voice recordings for transcription, handled ephemerally).
+   - Is all of the user data collected by your app encrypted in transit?
+     -> YES (All network requests use HTTPS / TLS 1.3).
+   - Do you provide a way for users to request that their data be deleted?
+     -> YES (Users can delete any saved letter directly inside the app).
+
+2. Data Types Declared:
+   A. Audio Files / Voice:
+      - Collected? YES (via Microphone when user records voice).
+      - Shared? NO.
+      - Ephemeral processing? YES (Voice audio is transcribed in real-time and not stored).
+      - Purpose: App Functionality (Speech-to-text letter dictation).
+
+   B. Documents / Files:
+      - Collected? NO (Saved strictly on local SQLite device storage).
+      - Shared? NO.
+
+3. App Permissions Declared in AndroidManifest.xml:
+   - android.permission.RECORD_AUDIO (Microphone - runtime permission)
+   - android.permission.INTERNET (Network access for AI processing)
+
+4. Target Audience & Content Rating:
+   - Target age group: 13 and older (General Audience / Productivity).
+   - Contains ads? NO.
+   - News app? NO.
+   - Financial features? NO.
+   - Government app? NO (Provides generic application templates for public utility).

@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">VoiceLetter AI</string>
+    <string name="speak_create">Speak &amp; Create</string>
+    <string name="type_letter">Type Letter</string>
+    <string name="templates">Templates</string>
+    <string name="my_documents">My Documents</string>
+    <string name="recent_letters">Recent Letters</string>
+    <string name="tap_to_speak">Tap to speak instructions or dictate letter</string>
+    <string name="listening">Listening… speak naturally</string>
+    <string name="regenerate">Regenerate</string>
+    <string name="export">Export</string>
+    <string name="share">Share</string>
+    <string name="print">Print</string>
+    <string name="save_pdf">Save as PDF</string>
+    <string name="save_docx">Save as DOCX</string>
+    <string name="save_txt">Save as Plain Text</string>
+</resources>

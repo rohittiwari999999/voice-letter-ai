@@ -1,0 +1,6 @@
+{
+  "name": "VoiceLetter AI",
+  "description": "Voice-powered AI letter writing assistant that creates, edits, formats, translates, and exports professional letters instantly from voice commands.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

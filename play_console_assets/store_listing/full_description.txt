@@ -1,0 +1,41 @@
+Transform your voice into beautifully formatted, professional letters in seconds with VoiceLetter AI!
+
+Whether you need a quick school leave application, a bank account closure request, a formal corporate resignation letter, or a civic grievance to municipal authorities, VoiceLetter AI understands your natural spoken words and formats them into an executive-grade letter.
+
+🎙️ SPEAK NATURALLY IN ANY LANGUAGE
+• One-Sentence Commands: Simply say "Write an application to my principal for three days leave due to fever" or "Principal ko chhutti ki application bana do".
+• Step-by-Step Dictation: Dictate sentence-by-sentence or word-by-word.
+• Multilingual & Mixed Speech: Speak in English, Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Odia, Punjabi, Assamese, Urdu, Spanish, French, German, Arabic, or mixed languages (Hinglish).
+• Cross-Language Generation: Speak in Hindi or your regional language and generate the letter in English, or vice versa!
+
+✍️ REAL-TIME VOICE EDITING & FORMATTING
+• Hands-Free Formatting: Say "Make the subject bold", "Center align the heading", "Change font size to 14", or "Align justify".
+• Quick Revisions: Say "Replace Monday with Tuesday", "Remove the last paragraph", or "Add my phone number below my name".
+• Tone Switcher: Shift instantly between Formal, Respectful, Urgent, Diplomatic, and Casual tones.
+• AI Grammar & Polish: One-tap grammar and spelling correction to ensure immaculate communication.
+
+📄 AUTHENTIC A4 DOCUMENT EDITOR
+• Interactive Paper View: View your letter on a realistic A4 document sheet with authentic page margins and typography.
+• Intelligent Placeholders: Missing personal details are marked as clear placeholders like [YOUR NAME], [ROLL NO], [DATE], or [ACCOUNT NO]—tap any chip to fill instantly without guesswork.
+• Customizable Typography: Choose between Classic Serif, Modern Sans-Serif, and Monospace fonts with line spacing and margin controls.
+
+📥 EXPORT, PRINT & SHARE
+• Export to PDF: Generate high-resolution, paginated A4 PDF documents with preserved Unicode characters and page numbering.
+• Export to DOCX: Output genuine Microsoft Word (.docx) files ready for corporate workflows.
+• Plain Text (.txt): Copy or export clean text for email or messaging.
+• Direct Print & Share: Print via wireless printer or share instantly via WhatsApp, Gmail, Drive, and more.
+
+📚 RICH TEMPLATE LIBRARY
+Pre-loaded with ready-to-use templates across:
+• Education & School: Sick leave, transfer certificate (TC), fee concession.
+• Banking: Savings account closure, ATM card re-issue, cheque book request.
+• Workplace & Office: Resignation letter, casual leave, experience certificate.
+• Career & Jobs: Job application cover letters, internship inquiries.
+• Civic & Government: Municipal complaints, RTI applications, electricity board issues.
+• Consumer Complaints: Defective product refunds, delayed service grievances.
+• Custom Templates: Author and save your own personalized templates.
+
+🔒 PRIVACY & SECURITY
+Your documents and drafts are stored securely on your device using an offline-first database. Voice permissions are used solely for real-time speech transcription.
+
+Experience the future of letter writing with VoiceLetter AI!
