@@ -43,6 +43,7 @@ class SpeechRecognitionManager(private val context: Context) {
     private var currentLocale: String = "hi-IN"
     private var shouldKeepListening: Boolean = false
     private var consecutiveErrorCount: Int = 0
+    private var simulationRunnable: Runnable? = null
 
     val isAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context)
@@ -69,6 +70,7 @@ class SpeechRecognitionManager(private val context: Context) {
             "$current ${extraText.trim()}"
         }
         _accumulatedTranscript.value = updated
+        _currentPartial.value = ""
         _liveTranscript.value = updated
     }
 
@@ -84,23 +86,70 @@ class SpeechRecognitionManager(private val context: Context) {
         _liveTranscript.value = ""
     }
 
+    /**
+     * Simulates natural live speech typing for testing and emulator demonstrations
+     * where hardware microphone input may not be piped from the host browser.
+     */
+    fun simulateLiveSpeechInput(fullPhrase: String, onFinished: (() -> Unit)? = null) {
+        simulationRunnable?.let { mainHandler.removeCallbacks(it) }
+        clearTranscript()
+        _isListening.value = true
+        _rmsLevel.value = 0.6f
+
+        val words = fullPhrase.trim().split("\\s+".toRegex())
+        var wordIndex = 0
+        var currentText = ""
+
+        val stepRunnable = object : Runnable {
+            override fun run() {
+                if (wordIndex < words.size) {
+                    val nextWord = words[wordIndex]
+                    currentText = if (currentText.isEmpty()) nextWord else "$currentText $nextWord"
+                    _liveTranscript.value = currentText
+                    _accumulatedTranscript.value = currentText
+                    _rmsLevel.value = (0.3f + (wordIndex % 4) * 0.18f).coerceIn(0.1f, 0.9f)
+                    wordIndex++
+                    mainHandler.postDelayed(this, 180L)
+                } else {
+                    _rmsLevel.value = 0f
+                    _isListening.value = false
+                    onFinished?.invoke()
+                }
+            }
+        }
+        simulationRunnable = stepRunnable
+        mainHandler.post(stepRunnable)
+    }
+
     private fun ensureRecognizerCreated() {
         if (speechRecognizer != null) return
 
         try {
-            if (!isAvailable) {
-                Log.w("SpeechManager", "Speech recognition unavailable on this device/emulator.")
-                _errorMessage.value = "Speech recognition service unavailable on device."
-                return
-            }
-
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
                 setRecognitionListener(createListener())
             }
+            Log.i("SpeechManager", "SpeechRecognizer initialized successfully")
         } catch (e: Exception) {
             Log.e("SpeechManager", "Error creating SpeechRecognizer", e)
-            _errorMessage.value = "Unable to initialize speech recognizer: ${e.message}"
+            _errorMessage.value = "Speech recognition error: ${e.message}"
         }
+    }
+
+    private fun extractMatches(bundle: Bundle?): List<String> {
+        if (bundle == null) return emptyList()
+        val list1 = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        if (!list1.isNullOrEmpty()) return list1
+
+        val list2 = bundle.getStringArrayList(RecognizerIntent.EXTRA_RESULTS)
+        if (!list2.isNullOrEmpty()) return list2
+
+        val list3 = bundle.getStringArrayList("results_recognition")
+        if (!list3.isNullOrEmpty()) return list3
+
+        val list4 = bundle.getStringArrayList("android.speech.extra.UNCONSUMED_INPUT")
+        if (!list4.isNullOrEmpty()) return list4
+
+        return emptyList()
     }
 
     private fun createListener(): RecognitionListener {
@@ -137,7 +186,6 @@ class SpeechRecognitionManager(private val context: Context) {
                 consecutiveErrorCount++
 
                 // Error 7: ERROR_NO_MATCH, Error 6: ERROR_SPEECH_TIMEOUT, Error 5: ERROR_CLIENT
-                // In continuous mode, silence or pauses trigger these. DO NOT STOP LISTENING!
                 val isNormalPause = error == SpeechRecognizer.ERROR_NO_MATCH ||
                         error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                         error == SpeechRecognizer.ERROR_CLIENT
@@ -145,10 +193,14 @@ class SpeechRecognitionManager(private val context: Context) {
                 if (isNormalPause) {
                     mainHandler.postDelayed({
                         if (shouldKeepListening) {
-                            speechRecognizer?.cancel()
-                            startListeningIntent()
+                            try {
+                                speechRecognizer?.cancel()
+                                startListeningIntent()
+                            } catch (e: Exception) {
+                                Log.e("SpeechManager", "Cancel/restart failed", e)
+                            }
                         }
-                    }, 200)
+                    }, 250)
                     return
                 }
 
@@ -163,12 +215,18 @@ class SpeechRecognitionManager(private val context: Context) {
                     }
                 }
 
-                // For busy or other errors, delay slightly and restart
-                val restartDelay = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 600L else 400L
+                // For busy or other errors, delay slightly, recreate recognizer if needed, and restart
+                val restartDelay = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 700L else 400L
                 mainHandler.postDelayed({
                     if (shouldKeepListening) {
                         try {
-                            speechRecognizer?.cancel()
+                            if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || consecutiveErrorCount > 3) {
+                                speechRecognizer?.destroy()
+                                speechRecognizer = null
+                                ensureRecognizerCreated()
+                            } else {
+                                speechRecognizer?.cancel()
+                            }
                             startListeningIntent()
                         } catch (e: Exception) {
                             Log.e("SpeechManager", "Failed to restart after error", e)
@@ -181,8 +239,8 @@ class SpeechRecognitionManager(private val context: Context) {
                 _rmsLevel.value = 0f
                 consecutiveErrorCount = 0
 
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val text = matches?.firstOrNull()?.trim() ?: ""
+                val matches = extractMatches(results)
+                val text = matches.firstOrNull()?.trim() ?: ""
 
                 if (text.isNotBlank()) {
                     val currentAcc = _accumulatedTranscript.value.trim()
@@ -196,7 +254,7 @@ class SpeechRecognitionManager(private val context: Context) {
                     _liveTranscript.value = newAcc
                 }
 
-                // Immediately continue listening for the next phrase/sentence!
+                // Immediately continue listening for the next phrase/sentence in continuous mode!
                 if (shouldKeepListening) {
                     mainHandler.postDelayed({
                         if (shouldKeepListening) {
@@ -209,8 +267,8 @@ class SpeechRecognitionManager(private val context: Context) {
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
-                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                val partial = matches?.firstOrNull()?.trim() ?: ""
+                val matches = extractMatches(partialResults)
+                val partial = matches.firstOrNull()?.trim() ?: ""
                 if (partial.isNotBlank()) {
                     _currentPartial.value = partial
                     val currentAcc = _accumulatedTranscript.value.trim()
@@ -228,15 +286,18 @@ class SpeechRecognitionManager(private val context: Context) {
 
         try {
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLocale)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, currentLocale)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                putExtra("android.speech.extra.PARTIAL_RESULTS", true)
+                putExtra("android.speech.extra.DICTATION_MODE", true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
                 // Generous pause allowance (up to 15s) so user can think between words
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 15000L)
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 15000L)
-                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 4000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 3000L)
             }
 
             speechRecognizer?.startListening(intent)
@@ -255,6 +316,7 @@ class SpeechRecognitionManager(private val context: Context) {
      * Stops continuous listening and returns the full accumulated transcript.
      */
     fun stopContinuousListening(): String {
+        simulationRunnable?.let { mainHandler.removeCallbacks(it) }
         shouldKeepListening = false
         _isListening.value = false
         _rmsLevel.value = 0f

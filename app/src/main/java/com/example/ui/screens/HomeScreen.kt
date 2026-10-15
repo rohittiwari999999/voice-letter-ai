@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
@@ -238,6 +239,8 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    val isHindi = letterLang.code.equals("hi", ignoreCase = true)
+
                     // Multilingual Language Selectors Row
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -250,7 +253,7 @@ fun HomeScreen(
                             leadingIcon = {
                                 Icon(Icons.Default.RecordVoiceOver, contentDescription = "Speak in", tint = ExecutiveBlue, modifier = Modifier.size(16.dp))
                             },
-                            label = { Text("Speak: ${voiceLang.displayName}", fontSize = 12.sp, fontWeight = FontWeight.Medium) },
+                            label = { Text(if (isHindi) "बोलें: ${voiceLang.displayName}" else "Speak: ${voiceLang.displayName}", fontSize = 12.sp, fontWeight = FontWeight.Medium) },
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = Color.White,
                                 labelColor = ExecutiveNavy
@@ -263,7 +266,7 @@ fun HomeScreen(
                             leadingIcon = {
                                 Icon(Icons.Default.Translate, contentDescription = "Letter in", tint = AccentTeal, modifier = Modifier.size(16.dp))
                             },
-                            label = { Text("Letter in: ${letterLang.displayName}", fontSize = 12.sp, fontWeight = FontWeight.Medium) },
+                            label = { Text(if (isHindi) "पत्र: ${letterLang.displayName}" else "Letter in: ${letterLang.displayName}", fontSize = 12.sp, fontWeight = FontWeight.Medium) },
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = Color.White,
                                 labelColor = ExecutiveNavy
@@ -274,8 +277,9 @@ fun HomeScreen(
                 }
             }
 
-            // Big Microphone Voice Card Hero
+            // Big Microphone Voice Card Hero with Prominent Top Live Speech Box
             item {
+                val isHindi = letterLang.code.equals("hi", ignoreCase = true)
                 ElevatedCard(
                     elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
                     colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
@@ -286,26 +290,153 @@ fun HomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 24.dp, horizontal = 16.dp)
+                            .padding(vertical = 20.dp, horizontal = 16.dp)
                     ) {
                         Text(
-                            text = if (isListening) "Listening… Speak now" else "Speak & Create Letter",
+                            text = if (isListening)
+                                (if (isHindi) "🔴 लाइव सुन रहा है — बोलते रहिए..." else "🔴 Listening… Speak now")
+                            else
+                                (if (isHindi) "बोलें और पत्र तैयार करें" else "Speak & Create Letter"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (isListening) Color(0xFFDC2626) else ExecutiveBlue
                         )
                         Text(
                             text = if (isListening)
-                                "Say what you need: full letter, sentence, or instructions"
+                                (if (isHindi) "आप जो बोलेंगे वह नीचे लाइव टेक्स्ट के रूप में प्रकट होगा" else "Say what you need — words appear live below as text")
                             else
-                                "Tap microphone and state what letter you need in any language",
+                                (if (isHindi) "माइक दबाकर बोलें — आपके शब्द यहाँ तुरंत लाइव टेक्स्ट के रूप में दिखेंगे" else "Tap microphone — spoken words will appear live as text right here"),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                         )
 
-                        // Big Animated Mic Button
+                        // 🔴 PROMINENT LIVE SPEECH MONITOR BOX (Placed above so user sees spoken text live!)
+                        Card(
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isListening) Color(0xFFFEF2F2) else Color(0xFFF8FAFC)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.5.dp,
+                                if (isListening) Color(0xFFF87171) else Color(0xFFCBD5E1)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("home_live_speech_box")
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isListening) Color(0xFFDC2626) else Color(0xFF16A34A))
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isListening)
+                                                "🔴 लाइव आवाज़ टेक्स्ट (Live Speech Text):"
+                                            else
+                                                "🎙️ बोली गई आवाज़ टेक्स्ट (Live Speech Transcript):",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isListening) Color(0xFF991B1B) else ExecutiveNavy
+                                        )
+                                    }
+
+                                    if (liveTranscript.isNotBlank()) {
+                                        Text(
+                                            text = "साफ़ करें",
+                                            fontSize = 11.sp,
+                                            color = Color.Gray,
+                                            modifier = Modifier.clickable { viewModel.speechManager.clearTranscript() }
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Surface(
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, PaperBorder),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        if (isGenerating) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = ExecutiveBlue
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = statusMessage.ifBlank { "AI पत्र तैयार कर रहा है..." },
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = ExecutiveBlue,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        } else if (liveTranscript.isNotBlank()) {
+                                            Text(
+                                                text = "\"$liveTranscript\"",
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = ExecutiveNavy,
+                                                lineHeight = 22.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = if (isListening)
+                                                    "बोलते रहिए... आपकी आवाज़ यहाँ लाइव टेक्स्ट के रूप में प्रकट होगी..."
+                                                else
+                                                    "माइक दबाकर बोलें — आपकी बोली हुई स्पीच यहाँ तुरंत टेक्स्ट के रूप में लाइव दिखेगी...",
+                                                fontSize = 13.sp,
+                                                color = Color(0xFF94A3B8),
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Quick action button if transcript is available
+                                if (liveTranscript.isNotBlank() && !isGenerating) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = { viewModel.generateLetterFromVoice(liveTranscript) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ExecutiveBlue),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("generate_letter_from_speech_button")
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isHindi) "इस बोली गई आवाज़ से पत्र बनाएं" else "Create Letter from Spoken Text",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Animated Mic Waveform Button
                         VoiceMicWaveform(
                             isListening = isListening,
                             rmsLevel = rmsLevel,
@@ -320,57 +451,8 @@ fun HomeScreen(
                                     permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                 }
                             },
-                            size = 80.dp
+                            size = 76.dp
                         )
-
-                        // Live Transcription / Progress display
-                        AnimatedVisibility(
-                            visible = liveTranscript.isNotBlank() || isGenerating,
-                            enter = fadeIn(),
-                            exit = fadeOut()
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isGenerating) Color(0xFFEFF6FF) else Color(0xFFF8FAFC),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, PaperBorder),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 16.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(12.dp)
-                                ) {
-                                    if (isGenerating) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp,
-                                            color = ExecutiveBlue
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            text = statusMessage.ifBlank { "Crafting your letter with AI…" },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = ExecutiveBlue,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    } else {
-                                        Icon(
-                                            Icons.Default.KeyboardVoice,
-                                            contentDescription = "Transcript",
-                                            tint = ExecutiveBlue,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "\"$liveTranscript\"",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = ExecutiveNavy
-                                        )
-                                    }
-                                }
-                            }
-                        }
 
                         // Alternative Direct Text Input bar
                         Spacer(modifier = Modifier.height(16.dp))
@@ -381,7 +463,12 @@ fun HomeScreen(
                             OutlinedTextField(
                                 value = manualPromptInput,
                                 onValueChange = { manualPromptInput = it },
-                                placeholder = { Text("Or type instructions here…", fontSize = 13.sp) },
+                                placeholder = {
+                                    Text(
+                                        if (isHindi) "या यहाँ निर्देश लिखें (जैसे: छुट्टी के लिए पत्र)..." else "Or type instructions here…",
+                                        fontSize = 13.sp
+                                    )
+                                },
                                 shape = RoundedCornerShape(12.dp),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -418,9 +505,10 @@ fun HomeScreen(
 
             // Quick Voice Command Examples Carousel
             item {
+                val isHindi = letterLang.code.equals("hi", ignoreCase = true)
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "Try Saying… (Tap to Generate)",
+                        text = if (isHindi) "बोलकर देखें (Tap to test voice):" else "Try Saying… (Tap to Generate):",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = ExecutiveNavy
@@ -466,6 +554,7 @@ fun HomeScreen(
 
             // Quick Action Grid: Type Letter, Templates, My Documents
             item {
+                val isHindi = letterLang.code.equals("hi", ignoreCase = true)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -473,8 +562,8 @@ fun HomeScreen(
                     ActionTile(
                         icon = Icons.Default.EditNote,
                         iconTint = ExecutiveBlue,
-                        title = "Type Letter",
-                        subtitle = "Blank document",
+                        title = if (isHindi) "पत्र लिखें" else "Type Letter",
+                        subtitle = if (isHindi) "नया पत्र" else "Blank document",
                         modifier = Modifier.weight(1f),
                         testTag = "type_letter_button",
                         onClick = { viewModel.createNewBlankLetter() }
@@ -483,8 +572,8 @@ fun HomeScreen(
                     ActionTile(
                         icon = Icons.Default.Description,
                         iconTint = AccentGold,
-                        title = "Templates",
-                        subtitle = "Ready formats",
+                        title = if (isHindi) "प्रारूप" else "Templates",
+                        subtitle = if (isHindi) "तैयार प्रारूप" else "Ready formats",
                         modifier = Modifier.weight(1f),
                         testTag = "templates_button",
                         onClick = { viewModel.navigateTo(AppScreen.TEMPLATES) }
@@ -493,8 +582,8 @@ fun HomeScreen(
                     ActionTile(
                         icon = Icons.Default.Folder,
                         iconTint = AccentTeal,
-                        title = "My Documents",
-                        subtitle = "Saved letters",
+                        title = if (isHindi) "सहेजे गए पत्र" else "My Documents",
+                        subtitle = if (isHindi) "दस्तावेज़ सूची" else "Saved letters",
                         modifier = Modifier.weight(1f),
                         testTag = "my_documents_button",
                         onClick = { viewModel.navigateTo(AppScreen.DOCUMENTS) }
@@ -504,19 +593,20 @@ fun HomeScreen(
 
             // Recent Letters Section
             item {
+                val isHindi = letterLang.code.equals("hi", ignoreCase = true)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Recent Letters",
+                        text = if (isHindi) "हाल के पत्र (Recent Letters)" else "Recent Letters",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = ExecutiveNavy
                     )
                     Text(
-                        text = "View All",
+                        text = if (isHindi) "सभी देखें" else "View All",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = ExecutiveBlue,

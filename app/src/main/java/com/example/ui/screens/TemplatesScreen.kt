@@ -66,21 +66,29 @@ fun TemplatesScreen(
     modifier: Modifier = Modifier
 ) {
     val customTemplates by viewModel.customTemplates.collectAsStateWithLifecycle()
-    var selectedCategory by remember { mutableStateOf("All") }
+    val letterLang by viewModel.letterOutputLanguage.collectAsStateWithLifecycle()
+    val isHindi = letterLang.code.equals("hi", ignoreCase = true)
+    var selectedCategory by remember(isHindi) { mutableStateOf(if (isHindi) "सभी (All)" else "All") }
 
     BackHandler {
         viewModel.navigateTo(AppScreen.HOME)
     }
 
-    val categories = TemplateItem.getCategories() + if (customTemplates.isNotEmpty()) listOf("My Custom") else emptyList()
+    val categories = TemplateItem.getCategories(letterLang.code) +
+            if (customTemplates.isNotEmpty()) listOf(if (isHindi) "मेरे प्रारूप (Custom)" else "My Custom") else emptyList()
 
-    val filteredTemplates = remember(selectedCategory) {
-        if (selectedCategory == "All") {
+    val filteredTemplates = remember(selectedCategory, isHindi) {
+        val isAll = selectedCategory == "All" || selectedCategory == "सभी (All)"
+        val isCustom = selectedCategory == "My Custom" || selectedCategory == "मेरे प्रारूप (Custom)"
+        if (isAll) {
             TemplateItem.ALL
-        } else if (selectedCategory == "My Custom") {
+        } else if (isCustom) {
             emptyList()
         } else {
-            TemplateItem.ALL.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+            TemplateItem.ALL.filter {
+                it.category.equals(selectedCategory, ignoreCase = true) ||
+                        it.getCategory("hi").equals(selectedCategory, ignoreCase = true)
+            }
         }
     }
 
@@ -89,7 +97,7 @@ fun TemplatesScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Letter Templates",
+                        text = if (isHindi) "पत्र प्रारूप (Letter Templates)" else "Letter Templates",
                         fontWeight = FontWeight.Bold,
                         color = ExecutiveNavy
                     )
@@ -208,7 +216,7 @@ fun TemplatesScreen(
                 if (selectedCategory != "My Custom") {
                     item {
                         Text(
-                            text = "Standard Letter Formats (${filteredTemplates.size})",
+                            text = if (isHindi) "मानक पत्र प्रारूप (${filteredTemplates.size})" else "Standard Letter Formats (${filteredTemplates.size})",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = ExecutiveNavy,
@@ -219,6 +227,7 @@ fun TemplatesScreen(
                     items(filteredTemplates) { template ->
                         TemplateCard(
                             template = template,
+                            languageCode = letterLang.code,
                             onUseTemplate = { viewModel.loadTemplate(template) },
                             onVoiceGenerate = { viewModel.generateLetterFromVoice(template.promptSuggestion) }
                         )
@@ -236,9 +245,11 @@ fun TemplatesScreen(
 @Composable
 private fun TemplateCard(
     template: TemplateItem,
+    languageCode: String,
     onUseTemplate: () -> Unit,
     onVoiceGenerate: () -> Unit
 ) {
+    val isHindi = languageCode.equals("hi", ignoreCase = true)
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -260,7 +271,7 @@ private fun TemplateCard(
                     modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Text(
-                        text = template.category,
+                        text = template.getCategory(languageCode),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = ExecutiveBlue,
@@ -280,14 +291,14 @@ private fun TemplateCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = template.title,
+                text = template.getTitle(languageCode),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = ExecutiveNavy
             )
 
             Text(
-                text = template.description,
+                text = template.getDescription(languageCode),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -332,7 +343,7 @@ private fun TemplateCard(
                     colors = ButtonDefaults.buttonColors(containerColor = ExecutiveBlue),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Use Template")
+                    Text(if (isHindi) "प्रारूप उपयोग करें" else "Use Template")
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
                 }

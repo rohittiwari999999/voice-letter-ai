@@ -97,8 +97,9 @@ fun A4DocumentCanvas(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        val isCanvasHindi = letter.letterLanguage.equals("hi", ignoreCase = true)
                         Text(
-                            text = "Unfilled placeholders (${placeholders.size}) - Tap to fill:",
+                            text = if (isCanvasHindi) "रिक्त स्थान भरें (${placeholders.size}) - भरने हेतु टैप करें:" else "Unfilled placeholders (${placeholders.size}) - Tap to fill:",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color(0xFF92400E),
                             fontWeight = FontWeight.Bold

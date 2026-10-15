@@ -300,10 +300,16 @@ Apply the user's modifications precisely. If the user asked to change a paragrap
     suspend fun translateLetter(currentLetter: Letter, targetLanguageCode: String): Letter {
         val targetLang = LanguageOption.findByCode(targetLanguageCode)
 
-        // If translating to Hindi and API is not active, run local Hindi translation logic
+        // If translating to Hindi, run local pure Hindi engine or translate cleanly
         if (targetLanguageCode.equals("hi", ignoreCase = true)) {
-            val prompt = currentLetter.subject + " " + currentLetter.bodyParagraphs.joinToString(" ")
-            return generateHindiLetter(prompt)
+            val prompt = currentLetter.cleanSubjectText() + " " + currentLetter.bodyParagraphs.joinToString(" ")
+            val hindiLetter = generateHindiLetter(prompt)
+            return hindiLetter.copy(
+                id = currentLetter.id,
+                letterLanguage = "hi",
+                formatting = currentLetter.formatting,
+                updatedAt = System.currentTimeMillis()
+            )
         }
 
         val prompt = """
@@ -582,6 +588,12 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
         return s
     }
 
+    private fun isMainlyLatin(text: String): Boolean {
+        val latin = text.count { it in 'a'..'z' || it in 'A'..'Z' }
+        val total = text.count { it.isLetter() }
+        return total > 0 && (latin.toFloat() / total > 0.35f)
+    }
+
     private fun parseLetterJson(raw: String, fallbackTopic: String, languageCode: String): Letter? {
         val json = cleanAndParseJsonObject(raw) ?: return null
 
@@ -589,14 +601,14 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
 
         val defaultTitle = if (isHindi) "औपचारिक प्रार्थना पत्र" else "Formal Application"
         val rawTitle = json.optString("title", defaultTitle)
-        val title = if (rawTitle.isBlank() || rawTitle.contains("ek letter banana hai", true)) defaultTitle else rawTitle
+        val title = if (rawTitle.isBlank() || rawTitle.contains("ek letter banana hai", true) || (isHindi && isMainlyLatin(rawTitle))) defaultTitle else rawTitle
 
         val letterTypeStr = json.optString("letterType", "CUSTOM_LETTER")
         val toneStr = json.optString("tone", "FORMAL")
 
         val defaultSender = if (isHindi) "[आपका नाम]\n[पता / संपर्क सूत्र]" else "[YOUR NAME]\n[ADDRESS]"
         val senderDetails = json.optString("senderDetails", defaultSender).let {
-            if (isHindi && it.contains("[YOUR NAME]")) defaultSender else it
+            if (isHindi && (it.contains("[YOUR NAME]") || isMainlyLatin(it))) defaultSender else it
         }
 
         val todayDate = if (isHindi) {
@@ -612,27 +624,34 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
             "The Concerned Authority,\n[ORGANIZATION / INSTITUTION NAME],\n[ADDRESS]"
         }
         val recipientDetails = json.optString("recipientDetails", defaultRecipient).let {
-            if (isHindi && (it.contains("The Concerned", true) || it.contains("[ORGANIZATION", true))) defaultRecipient else it
+            if (isHindi && (it.contains("The Concerned", true) || it.contains("[ORGANIZATION", true) || isMainlyLatin(it))) defaultRecipient else it
         }
 
         val rawSubject = json.optString("subject", "")
-        val cleanSubject = sanitizeSubject(rawSubject, languageCode)
+        var cleanSubject = sanitizeSubject(rawSubject, languageCode)
+        if (isHindi && isMainlyLatin(cleanSubject)) {
+            cleanSubject = if (fallbackTopic.isNotBlank()) "$fallbackTopic के संबंध में प्रार्थना पत्र" else "आवश्यक कार्य हेतु प्रार्थना पत्र"
+        }
 
         val defaultSalutation = if (isHindi) "आदरणीय महोदय / महोदया," else "Dear Sir/Madam,"
         val rawSalutation = json.optString("salutation", defaultSalutation)
-        val salutation = if (isHindi && (rawSalutation.contains("Dear", true) || rawSalutation.contains("Sir", true))) defaultSalutation else rawSalutation
+        val salutation = if (isHindi && (rawSalutation.contains("Dear", true) || rawSalutation.contains("Sir", true) || isMainlyLatin(rawSalutation))) defaultSalutation else rawSalutation
 
         val defaultClose = if (isHindi) "सधन्यवाद,\nभवदीय," else "Yours sincerely,"
         val rawClose = json.optString("complimentaryClose", defaultClose)
-        val complimentaryClose = if (isHindi && (rawClose.contains("sincerely", true) || rawClose.contains("Yours", true))) defaultClose else rawClose
+        val complimentaryClose = if (isHindi && (rawClose.contains("sincerely", true) || rawClose.contains("Yours", true) || isMainlyLatin(rawClose))) defaultClose else rawClose
 
         val defaultSigner = if (isHindi) "[आपका नाम]" else "[YOUR NAME]"
         val signerName = json.optString("signerName", defaultSigner).let {
-            if (isHindi && it.contains("[YOUR NAME]")) defaultSigner else it
+            if (isHindi && (it.contains("[YOUR NAME]") || isMainlyLatin(it))) defaultSigner else it
         }
 
-        val signerDesignation = json.optString("signerDesignation", if (isHindi) "[प्रार्थी / पद]" else "")
-        val enclosures = json.optString("enclosures", "")
+        val signerDesignation = json.optString("signerDesignation", if (isHindi) "[प्रार्थी / पद]" else "").let {
+            if (isHindi && isMainlyLatin(it)) "[प्रार्थी / पद]" else it
+        }
+        val enclosures = json.optString("enclosures", "").let {
+            if (isHindi && isMainlyLatin(it)) "" else it
+        }
 
         val paras = mutableListOf<String>()
         val parasArray = json.optJSONArray("bodyParagraphs")
@@ -648,14 +667,12 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
             }
         }
 
-        // If paras are empty or contain conversational raw fluff, provide high quality defaults
-        val finalParas = if (paras.isEmpty() || paras.any { it.contains("ek letter banana hai", true) }) {
+        val hasEnglishBody = isHindi && paras.any { isMainlyLatin(it) }
+        val finalParas = if (paras.isEmpty() || hasEnglishBody || paras.any { it.contains("ek letter banana hai", true) }) {
             if (isHindi) {
-                listOf(
-                    "सविनय निवेदन यह है कि मैं उपरोक्त विषय के संदर्भ में यह प्रार्थना पत्र सादर प्रेषित कर रहा/रही हूँ।",
-                    "महोदय, मुझे एक आवश्यक कार्यवश यह निवेदन प्रस्तुत करना है। कृपया इस प्रार्थना पत्र पर विचार करते हुए आवश्यक स्वीकृति अथवा कार्यवाही प्रदान करने की कृपा करें।",
-                    "आपके बहुमूल्य समय एवं सहयोग के लिए मैं आपका सदैव आभारी रहूँगा/रहूँगी।"
-                )
+                // Return high-quality native Hindi paragraphs matched to the topic
+                val fallbackModel = generateHindiLetter(fallbackTopic)
+                fallbackModel.bodyParagraphs
             } else {
                 listOf(
                     "I am writing this formal application with reference to the subject mentioned above.",

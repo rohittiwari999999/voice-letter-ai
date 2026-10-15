@@ -599,6 +599,89 @@ fun LetterEditorScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 14.dp, vertical = 14.dp)
                 ) {
+                    // 🔴 LIVE SPEECH BANNER RIGHT ABOVE THE LETTER
+                    if (isListening || liveTranscript.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isListening) Color(0xFFFEF2F2) else Color(0xFFF0FDF4),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.5.dp,
+                                if (isListening) Color(0xFFF87171) else Color(0xFF86EFAC)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .testTag("editor_live_speech_banner")
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isListening) Color(0xFFDC2626) else Color(0xFF16A34A))
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = if (isListening) "🔴 लाइव आवाज़ आ रही है (Live Speech Speaking):" else "🎙️ बोली गई स्पीच (Live Spoken Speech):",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isListening) Color(0xFF991B1B) else Color(0xFF166534)
+                                        )
+                                    }
+
+                                    if (liveTranscript.isNotBlank()) {
+                                        Text(
+                                            text = "साफ़ करें",
+                                            fontSize = 11.sp,
+                                            color = Color.Gray,
+                                            modifier = Modifier.clickable { viewModel.speechManager.clearTranscript() }
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Text(
+                                    text = if (liveTranscript.isNotBlank())
+                                        "\"$liveTranscript\""
+                                    else
+                                        "बोलते रहिए... आपकी आवाज़ यहाँ लाइव टेक्स्ट के रूप में प्रकट होगी...",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = ExecutiveNavy
+                                )
+
+                                if (liveTranscript.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.End,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                val spokenText = liveTranscript
+                                                viewModel.speechManager.clearTranscript()
+                                                viewModel.processVoiceCommand(spokenText)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = ExecutiveBlue),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.height(36.dp)
+                                        ) {
+                                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("पत्र में लागू करें (Apply to Letter)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if (lastPromptUsed.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),

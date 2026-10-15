@@ -143,16 +143,25 @@ class VoiceLetterViewModel(application: Application) : AndroidViewModel(applicat
     fun setVoiceInputLanguage(lang: LanguageOption, syncLetterOutput: Boolean = true) {
         _voiceInputLanguage.value = lang
         if (syncLetterOutput) {
-            _letterOutputLanguage.value = lang
+            setLetterOutputLanguage(lang)
         }
     }
 
     fun setLetterOutputLanguage(lang: LanguageOption) {
         _letterOutputLanguage.value = lang
+        // If an active letter is open and not in this language, translate it immediately!
+        val current = _currentLetter.value
+        if (current != null && !current.letterLanguage.equals(lang.code, ignoreCase = true)) {
+            translateCurrentLetter(lang)
+        }
     }
 
     fun applyQuickPrompt(prompt: String) {
         speechManager.setManualTranscript(prompt)
+    }
+
+    fun simulateVoicePhrase(phrase: String) {
+        speechManager.simulateLiveSpeechInput(phrase)
     }
 
     fun setSearchQuery(query: String) {
@@ -197,8 +206,18 @@ class VoiceLetterViewModel(application: Application) : AndroidViewModel(applicat
 
     fun loadTemplate(templateItem: TemplateItem) {
         viewModelScope.launch {
-            val initial = templateItem.initialLetter.copy(
-                letterLanguage = _letterOutputLanguage.value.code,
+            val targetLangCode = _letterOutputLanguage.value.code
+            val isHindi = targetLangCode.equals("hi", ignoreCase = true)
+            val templateLetter = templateItem.getLetterForLanguage(targetLangCode)
+            val todayDate = if (isHindi) {
+                java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale("hi", "IN")).format(java.util.Date())
+            } else {
+                java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+            }
+            val initial = templateLetter.copy(
+                id = 0,
+                letterLanguage = targetLangCode,
+                dateString = todayDate,
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
             )
@@ -210,11 +229,47 @@ class VoiceLetterViewModel(application: Application) : AndroidViewModel(applicat
 
     fun createNewBlankLetter() {
         viewModelScope.launch {
-            val blank = Letter(
-                title = "New Letter",
-                letterLanguage = _letterOutputLanguage.value.code,
-                bodyParagraphs = listOf("I am writing to formally request...")
-            )
+            val targetLangCode = _letterOutputLanguage.value.code
+            val isHindi = targetLangCode.equals("hi", ignoreCase = true)
+            val blank = if (isHindi) {
+                val todayDate = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale("hi", "IN")).format(java.util.Date())
+                Letter(
+                    title = "नया औपचारिक प्रार्थना पत्र",
+                    letterLanguage = "hi",
+                    dateString = todayDate,
+                    senderDetails = "[आपका नाम]\n[पता / संपर्क सूत्र]",
+                    recipientDetails = "सक्षम अधिकारी महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]",
+                    subject = "आवश्यक कार्य हेतु प्रार्थना पत्र",
+                    salutation = "आदरणीय महोदय / महोदया,",
+                    bodyParagraphs = listOf(
+                        "सविनय निवेदन यह है कि मैं उपरोक्त विषय के संदर्भ में यह प्रार्थना पत्र सादर प्रस्तुत कर रहा/रही हूँ।",
+                        "महोदय, मुझे एक आवश्यक कार्यवश यह निवेदन प्रस्तुत करना है। कृपया इस प्रार्थना पत्र पर विचार करते हुए आवश्यक कार्यवाही करने की कृपा करें।",
+                        "आपके सहयोग के लिए मैं आपका सदैव आभारी रहूँगा/रहूँगी।"
+                    ),
+                    complimentaryClose = "सादर धन्यवाद,\nभवदीय,",
+                    signerName = "[आपका नाम]",
+                    signerDesignation = "[प्रार्थी / पद]"
+                )
+            } else {
+                val todayDate = java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+                Letter(
+                    title = "New Formal Letter",
+                    letterLanguage = targetLangCode,
+                    dateString = todayDate,
+                    senderDetails = "[YOUR NAME]\n[ADDRESS / CONTACT]",
+                    recipientDetails = "The Concerned Authority,\n[ORGANIZATION / INSTITUTION],\n[CITY]",
+                    subject = "Application for Urgent Official Matter",
+                    salutation = "Dear Sir/Madam,",
+                    bodyParagraphs = listOf(
+                        "I am writing this formal application with reference to the subject mentioned above.",
+                        "Kindly consider this request favorably and advise on the next steps.",
+                        "Thank you for your valuable time and cooperation."
+                    ),
+                    complimentaryClose = "Yours sincerely,",
+                    signerName = "[YOUR NAME]",
+                    signerDesignation = "[APPLICANT / DESIGNATION]"
+                )
+            }
             val id = repository.saveLetter(blank)
             _currentLetter.value = blank.copy(id = id)
             _currentScreen.value = AppScreen.EDITOR
