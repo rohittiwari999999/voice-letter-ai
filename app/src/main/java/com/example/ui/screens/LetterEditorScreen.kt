@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -451,19 +453,32 @@ fun LetterEditorScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     // Voice prompt suggestions carousel
-                    val editorVoiceHints = listOf(
-                        "ये शब्द हटा दो",
-                        "पिछला वाक्य हटा दो",
-                        "सब्जेक्ट बोल्ड करो",
-                        "Make the subject bold",
-                        "Delete this word",
-                        "Delete previous sentence",
-                        "Align center",
-                        "हिंदी में अनुवाद करो",
-                        "Translate to English",
-                        "Change font size to 14",
-                        "Save as PDF"
-                    )
+                    val isHindiLetter = letter.letterLanguage.equals("hi", ignoreCase = true)
+                    val editorVoiceHints = if (isHindiLetter) {
+                        listOf(
+                            "विषय बदलो",
+                            "मैटर में जोड़ो",
+                            "लहजा आदरणीय करो",
+                            "लहजा कड़ा करो",
+                            "पत्र छोटा करो",
+                            "विस्तार करो",
+                            "संलग्नक जोड़ो",
+                            "हिंदी में अनुवाद करो",
+                            "Save as PDF"
+                        )
+                    } else {
+                        listOf(
+                            "Change subject",
+                            "Add to body",
+                            "Make tone respectful",
+                            "Make tone urgent",
+                            "Shorten letter",
+                            "Expand letter",
+                            "Add enclosure",
+                            "Translate to Hindi",
+                            "Save as PDF"
+                        )
+                    }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier
@@ -533,15 +548,23 @@ fun LetterEditorScreen(
                             onValueChange = { commandInputText = it },
                             placeholder = {
                                 Text(
-                                    if (isListening) "Listening voice command…" else "Speak or type voice command…",
-                                    fontSize = 12.sp
+                                    text = if (isListening)
+                                        (if (isHindiLetter) "🟢 आवाज़ सुन रहा है... बोलते रहिए" else "Listening voice command…")
+                                    else
+                                        (if (isHindiLetter) "माइक से बोलें या सुधार का निर्देश लिखें..." else "Speak or type voice command…"),
+                                    fontSize = 12.sp,
+                                    color = if (isListening) Color(0xFF16A34A) else Color.Gray
                                 )
                             },
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = if (isListening) Color(0xFF15803D) else ExecutiveNavy,
+                                fontWeight = if (isListening) FontWeight.Bold else FontWeight.Normal
+                            ),
                             shape = RoundedCornerShape(20.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = ExecutiveBlue,
-                                unfocusedBorderColor = PaperBorder
+                                focusedBorderColor = if (isListening) Color(0xFF16A34A) else ExecutiveBlue,
+                                unfocusedBorderColor = if (isListening) Color(0xFF86EFAC) else PaperBorder
                             ),
                             modifier = Modifier.weight(1f)
                         )
@@ -599,14 +622,14 @@ fun LetterEditorScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 14.dp, vertical = 14.dp)
                 ) {
-                    // 🔴 LIVE SPEECH BANNER RIGHT ABOVE THE LETTER
+                    // 🟢 LIVE SPEECH BANNER RIGHT ABOVE THE LETTER
                     if (isListening || liveTranscript.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isListening) Color(0xFFFEF2F2) else Color(0xFFF0FDF4),
+                            color = Color(0xFFF0FDF4),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.5.dp,
-                                if (isListening) Color(0xFFF87171) else Color(0xFF86EFAC)
+                                Color(0xFF22C55E)
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -624,14 +647,14 @@ fun LetterEditorScreen(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isListening) Color(0xFFDC2626) else Color(0xFF16A34A))
+                                                .background(if (isListening) Color(0xFF16A34A) else Color(0xFF15803D))
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = if (isListening) "🔴 लाइव आवाज़ आ रही है (Live Speech Speaking):" else "🎙️ बोली गई स्पीच (Live Spoken Speech):",
+                                            text = if (isListening) "🟢 लाइव आवाज़ आ रही है (Live Speech Speaking):" else "🎙️ बोली गई स्पीच (Live Spoken Speech):",
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isListening) Color(0xFF991B1B) else Color(0xFF166534)
+                                            color = Color(0xFF15803D)
                                         )
                                     }
 
@@ -639,7 +662,8 @@ fun LetterEditorScreen(
                                         Text(
                                             text = "साफ़ करें",
                                             fontSize = 11.sp,
-                                            color = Color.Gray,
+                                            color = Color(0xFF047857),
+                                            fontWeight = FontWeight.SemiBold,
                                             modifier = Modifier.clickable { viewModel.speechManager.clearTranscript() }
                                         )
                                     }
@@ -651,10 +675,10 @@ fun LetterEditorScreen(
                                     text = if (liveTranscript.isNotBlank())
                                         "\"$liveTranscript\""
                                     else
-                                        "बोलते रहिए... आपकी आवाज़ यहाँ लाइव टेक्स्ट के रूप में प्रकट होगी...",
+                                        "बोलते रहिए... आपकी आवाज़ यहाँ तुरंत हरे लाइव टेक्स्ट में प्रकट होगी...",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ExecutiveNavy
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF15803D) // 🟢 Green color for live text!
                                 )
 
                                 if (liveTranscript.isNotBlank()) {

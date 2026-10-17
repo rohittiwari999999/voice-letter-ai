@@ -16,6 +16,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class ParsedUserInstructions(
+    val subject: String? = null,
+    val matter: String? = null,
+    val recipient: String? = null,
+    val sender: String? = null,
+    val specialDirections: String? = null
+)
+
 object AiLetterGenerator {
     private const val TAG = "AiLetterGenerator"
 
@@ -34,18 +42,22 @@ CRITICAL RULES:
    If the target language is English ("en"), the letter must be in authentic formal English.
 3. SUBJECT FORMAT:
    Return ONLY the clean subject text (e.g. "बीमारी के कारण अवकाश हेतु प्रार्थना पत्र" or "Application for sick leave due to fever"). DO NOT prefix it with "Subject:" or "विषय:" because the app UI formats that automatically!
-4. DO NOT invent sensitive private facts (names, phone numbers, account numbers, roll numbers). When details are not provided in the prompt, mark them clearly as uppercase bracketed placeholders like [आपका नाम] or [YOUR NAME], [कक्षा] or [CLASS], [रोल नंबर] or [ROLL NO], [विद्यालय का नाम] or [SCHOOL NAME], [बैंक खाता संख्या] or [BANK A/C NO], [दिनांक] or [DATE], [शहर] or [CITY].
-5. IN-STREAM EDITING, CORRECTIONS & DELETIONS (MULTILINGUAL - ALL LANGUAGES):
+4. PRO USER-INSTRUCTED DIRECTIONS (CRITICAL):
+   When the user instructs: "ek patra likho jiski subject ye hoga aur ye matter hoga inke naam likhna hai", or specifies subject, matter, recipient, or sender:
+   - Extract and strictly adhere to the exact subject, matter details, recipient, and sender directed by the user!
+   - Do NOT invent fake different names or alternate topics when the user gave specific directions.
+   - Craft elegant formal paragraphs directly expanding on the user's provided matter.
+5. DO NOT invent sensitive private facts (passwords, bank passwords). When details are not provided in the prompt, mark them clearly as uppercase bracketed placeholders like [आपका नाम] or [YOUR NAME], [कक्षा] or [CLASS], [रोल नंबर] or [ROLL NO], [विद्यालय का नाम] or [SCHOOL NAME], [बैंक खाता संख्या] or [BANK A/C NO], [दिनांक] or [DATE], [शहर] or [CITY].
+6. IN-STREAM EDITING, CORRECTIONS & DELETIONS (MULTILINGUAL - ALL LANGUAGES):
    If the user dictates speech or issues voice commands containing deletion or correction instructions in ANY language:
    Examples:
    - "ye shabd delete kar do" / "ye shabd hata do" / "delete this word" / "remove this word"
    - "[word] delete kar do" / "[word] hata do" / "[word] mita do" / "delete [word]" / "remove [word]"
    - "pichla vakya hata do" / "aakhiri line hata do" / "delete previous sentence" / "remove last sentence"
    - "Monday nahi Tuesday" / "replace Monday with Tuesday" / "Monday ki jagah Tuesday kar do"
-   - Regional & world languages: "X kete dao" (Bengali), "X kadhun taka" (Marathi), "X theeseyandi" (Telugu), "X neekavum" (Tamil), "borrar X" (Spanish), "supprimer X" (French), etc.
    YOU MUST EXECUTE THE REQUESTED DELETION/CORRECTION ACCURATELY!
-   NEVER include the command phrases (e.g. "ye shabd delete kar do", "hata do", "delete that") in the letter output text.
-6. Return ONLY a single raw JSON object with keys:
+   NEVER include the command phrases in the letter output text.
+7. Return ONLY a single raw JSON object with keys:
 {
   "title": "Title of Letter",
   "letterType": "LEAVE_APPLICATION",
@@ -74,6 +86,7 @@ CRITICAL RULES:
     ): Letter {
         val targetLang = LanguageOption.findByCode(targetLanguageCode)
         val cleanedTopic = cleanUserConversationalFluff(prompt)
+        val instructions = extractUserStructuredInstructions(prompt)
 
         val promptPayload = """
 User Voice Prompt: "$prompt"
@@ -81,15 +94,22 @@ Extracted Core Intent Topic: "${if (cleanedTopic.isBlank()) "General Formal Requ
 Target Output Language for the Letter: ${targetLang.displayName} (${targetLang.nativeName}, code: ${targetLang.code})
 Input Audio Language: $voiceInputLanguageCode
 
-Generate the complete structured letter entirely in ${targetLang.displayName}.
-CRITICAL: Ensure zero conversational meta-phrases like "ek letter banana hai" appear in the letter text.
-If target language is Hindi (${targetLang.code} == 'hi'), the ENTIRE letter MUST be written in Devanagari Hindi.
+PRO USER DIRECTIONS EXTRACTED:
+- Explicit Subject: ${instructions.subject ?: "Derive from prompt"}
+- Explicit Matter / Body: ${instructions.matter ?: "Derive from prompt"}
+- Explicit Recipient: ${instructions.recipient ?: "Derive from prompt"}
+- Explicit Sender: ${instructions.sender ?: "Derive from prompt"}
+
+CRITICAL REQUIREMENTS:
+1. Prepare the complete professional letter adhering strictly to the user's directions.
+2. Ensure zero conversational meta-phrases appear in the letter text.
+3. If target language is Hindi (${targetLang.code} == 'hi'), the ENTIRE letter (Subject, Recipient, Salutation, Body, Signer) MUST be 100% authentic Devanagari Hindi. Zero English words!
 """
 
         val result = GeminiClient.generateContent(promptPayload, SYSTEM_INSTRUCTION)
         if (result.isSuccess) {
             val rawResponse = result.getOrNull() ?: ""
-            val parsed = parseLetterJson(rawResponse, cleanedTopic, targetLanguageCode)
+            val parsed = parseLetterJson(rawResponse, cleanedTopic, targetLanguageCode, instructions)
             if (parsed != null) {
                 return parsed
             }
@@ -97,7 +117,7 @@ If target language is Hindi (${targetLang.code} == 'hi'), the ENTIRE letter MUST
 
         // Smart local rule-based letter engine with full native Hindi and English generators
         Log.i(TAG, "Using smart local multilingual rule-based letter builder")
-        return smartLocalFallback(prompt, targetLanguageCode)
+        return smartLocalFallback(prompt, targetLanguageCode, instructions)
     }
 
     suspend fun processVoiceEdit(
@@ -244,6 +264,118 @@ If target language is Hindi (${targetLang.code} == 'hi'), the ENTIRE letter MUST
             return translateLetter(currentLetter, "en")
         }
 
+        // Direction: Subject Change ("विषय बदलो X", "change subject to X", "subject X kar do")
+        val subjectEditPatterns = listOf(
+            Regex("""(?i)(?:change\s+subject\s+to|subject\s+badal\s+kar|subject\s+badlo|विषय\s+बदल\s+कर|विषय\s+बदलो|subject\s+kar\s+do|subject\s+rakho)\s*[:=]?\s*(.+)"""),
+            Regex("""(?i)(?:make\s+subject|set\s+subject)\s*[:=]?\s*(.+)""")
+        )
+        for (pattern in subjectEditPatterns) {
+            val m = pattern.find(command)
+            if (m != null) {
+                val newSub = sanitizeSubject(m.groupValues[1].trim(), targetLanguageCode)
+                if (newSub.isNotBlank()) {
+                    return currentLetter.copy(
+                        title = newSub,
+                        subject = newSub,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
+
+        // Direction: Add points to matter/body ("मैटर में जोड़ो X", "विवरण में जोड़ो X", "add to body X")
+        val matterAddPatterns = listOf(
+            Regex("""(?i)(?:matter\s+me\s+jodo|matter\s+me\s+add\s+karo|विवरण\s+में\s+जोड़ो|मैटर\s+में\s+जोड़ो|add\s+to\s+body|body\s+me\s+likho|ye\s+point\s+add\s+karo|add\s+point)\s*[:=]?\s*(.+)"""),
+            Regex("""(?i)(?:add\s+sentence|add\s+paragraph)\s*[:=]?\s*(.+)""")
+        )
+        for (pattern in matterAddPatterns) {
+            val m = pattern.find(command)
+            if (m != null) {
+                val extraText = m.groupValues[1].trim()
+                if (extraText.isNotBlank()) {
+                    val updatedParas = currentLetter.bodyParagraphs + extraText
+                    return currentLetter.copy(
+                        bodyParagraphs = updatedParas,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
+
+        // Direction: Change recipient name ("प्राप्तकर्ता बदलो X", "change recipient to X", "X ke naam kar do")
+        val recipientEditPatterns = listOf(
+            Regex("""(?i)(?:recipient\s+change\s+karo|recipient\s+badlo|प्राप्तकर्ता\s+बदलो|change\s+recipient\s+to)\s*[:=]?\s*(.+)"""),
+            Regex("""(?i)(.+?)\s+(?:ke\s+naam\s+kar\s+do|ko\s+bhejna\s+hai)""")
+        )
+        for (pattern in recipientEditPatterns) {
+            val m = pattern.find(command)
+            if (m != null) {
+                val newRec = m.groupValues[1].trim()
+                if (newRec.isNotBlank()) {
+                    val formatted = if (targetLanguageCode == "hi") "सेवा में,\n$newRec महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]" else "To,\n$newRec,\n[ORGANIZATION / INSTITUTION],\n[CITY]"
+                    return currentLetter.copy(
+                        recipientDetails = formatted,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
+
+        // Direction: Change sender name ("प्रार्थी का नाम X कर दो", "sender name X", "mera naam X kar do")
+        val senderEditPatterns = listOf(
+            Regex("""(?i)(?:sender\s+name|mera\s+naam|prarthi\s+ka\s+naam|प्रार्थी\s+का\s+नाम|change\s+sender\s+to)\s*(?:badal\s+kar|kar\s+do|rakho|:|-|=)?\s*(.+)""")
+        )
+        for (pattern in senderEditPatterns) {
+            val m = pattern.find(command)
+            if (m != null) {
+                val newSender = m.groupValues[1].trim()
+                if (newSender.isNotBlank()) {
+                    val formattedSender = "$newSender\n[पता / संपर्क सूत्र]"
+                    return currentLetter.copy(
+                        senderDetails = formattedSender,
+                        signerName = newSender,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
+
+        // Direction: Tone adjustments
+        if (cleanCmd.contains("विनम्र") || cleanCmd.contains("respectful") || cleanCmd.contains("आदरणीय")) {
+            return adjustTone(currentLetter, LetterTone.RESPECTFUL)
+        }
+        if (cleanCmd.contains("सख्त") || cleanCmd.contains("urgent") || cleanCmd.contains("तत्काल") || cleanCmd.contains("strict")) {
+            return adjustTone(currentLetter, LetterTone.URGENT)
+        }
+        if (cleanCmd.contains("छोटा करो") || cleanCmd.contains("shorten") || cleanCmd.contains("concise")) {
+            val shortParas = currentLetter.bodyParagraphs.take(2).map { it.replace("अत्यधिक ", "").replace("सादर ", "") }
+            return currentLetter.copy(bodyParagraphs = shortParas, updatedAt = System.currentTimeMillis())
+        }
+        if (cleanCmd.contains("बड़ा करो") || cleanCmd.contains("expand") || cleanCmd.contains("विस्तार")) {
+            val extraPara = if (targetLanguageCode == "hi") {
+                "संबंधित प्रकरण में यह भी उल्लेख करना समीचीन होगा कि सभी आवश्यक औपचारिकताओं एवं संलग्नकों की पूर्ति पूर्व में ही कर दी गई है। अतः यथाशीघ्र सकारात्मक निर्णय लेने की कृपा करें।"
+            } else {
+                "It is also pertinent to mention that all requisite supporting documents have been verified and submitted for reference. Your prompt action in this regard will be highly appreciated."
+            }
+            return currentLetter.copy(bodyParagraphs = currentLetter.bodyParagraphs + extraPara, updatedAt = System.currentTimeMillis())
+        }
+        if (cleanCmd.contains("संलग्नक जोड़ो") || cleanCmd.contains("add enclosure")) {
+            val encText = command.substringAfter("जोड़ो", "").substringAfter("enclosure", "").trim()
+            if (encText.isNotBlank()) {
+                val updatedEnc = if (currentLetter.enclosures.isBlank()) encText else "${currentLetter.enclosures}\n$encText"
+                return currentLetter.copy(enclosures = updatedEnc, updatedAt = System.currentTimeMillis())
+            }
+        }
+
+        // Direction: Regenerate / redo if result was not satisfactory
+        if (cleanCmd.contains("दोबारा") || cleanCmd.contains("फिर से") || cleanCmd.contains("dobara") ||
+            cleanCmd.contains("fir se") || cleanCmd.contains("regenerate") || cleanCmd.contains("redo") ||
+            cleanCmd.contains("accha nahi laga") || cleanCmd.contains("अच्छा नहीं लगा")
+        ) {
+            val prompt = currentLetter.cleanSubjectText() + " " + currentLetter.bodyParagraphs.joinToString(" ")
+            return generateLetter(prompt, targetLanguageCode, targetLanguageCode)
+        }
+
         // Call Gemini for context-aware refinement if API available
         val currentJson = JSONObject().apply {
             put("title", currentLetter.title)
@@ -265,12 +397,20 @@ If target language is Hindi (${targetLang.code} == 'hi'), the ENTIRE letter MUST
 Current Letter JSON:
 $currentJson
 
-User Voice Instruction to modify the letter:
+User Voice Edit Direction:
 "$command"
 
 Target Language: $targetLanguageCode
 
-Apply the user's modifications precisely. If the user asked to change a paragraph, delete a sentence, add details, change tone, or translate, update the JSON accordingly. Return ONLY the modified JSON object.
+TASK:
+The user reviewed the letter and gave an edit direction. Automatically make the right decision:
+- If changing the subject: update "subject" and "title" to the exact new subject.
+- If adding, updating or removing points from the matter: update "bodyParagraphs" accurately.
+- If changing recipient: update "recipientDetails" to the specified person or authority.
+- If changing sender: update "senderDetails" and "signerName".
+- If requesting tone change (more respectful, stricter, urgent, formal): adjust wording in bodyParagraphs.
+- If target language is Hindi, ensure 100% pure authentic Devanagari Hindi without any English words!
+Return ONLY a valid JSON object matching the Letter schema with all fields.
 """
 
         val result = GeminiClient.generateContent(prompt, SYSTEM_INSTRUCTION)
@@ -421,6 +561,90 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
         }
 
         return currentLetter
+    }
+
+    /**
+     * Extracts structured user instructions when user specifies components directly:
+     * e.g., "ek patra likho jiski subject ye hoga X aur ye matter hoga Y inke naam likhna hai Z sender W hai"
+     */
+    fun extractUserStructuredInstructions(rawPrompt: String): ParsedUserInstructions {
+        val prompt = rawPrompt.trim()
+        var subject: String? = null
+        var matter: String? = null
+        var recipient: String? = null
+        var sender: String? = null
+
+        // 1. Recipient extraction ("X ke naam likhna hai", "inke naam: X", "recipient: X")
+        val recipientPatterns = listOf(
+            Regex("""(?i)(.+?)\s+(?:ke\s+naam\s+likhna\s+hai|ko\s+likhna\s+hai|ke\s+liye\s+likhna\s+hai|ke\s+naam\s+bhejna\s+hai)"""),
+            Regex("""(?i)(?:inke|kiske|unke)\s+naam\s*(?:likhna\s+hai|hoga|rahega)?\s*[:=-]?\s*['"“]?([^,\n]+?)(?:['"”]|\s*(?:aur|matter|subject|sender|prarthi|$))"""),
+            Regex("""(?i)(?:to|recipient|प्राप्तकर्ता)\s*[:=-]?\s*['"“]?([^,\n]+?)(?:['"”]|\s*(?:aur|matter|subject|sender|prarthi|$))""")
+        )
+        for (p in recipientPatterns) {
+            val m = p.find(prompt)
+            if (m != null) {
+                val candidate = m.groupValues[1].trim()
+                val cleanCand = candidate.removePrefix("ek patra").removePrefix("ek letter").removePrefix("application").removePrefix("aur").trim()
+                if (cleanCand.isNotBlank() && cleanCand.length > 2 && !cleanCand.equals("ye", true)) {
+                    recipient = cleanCand
+                    break
+                }
+            }
+        }
+
+        // 2. Subject extraction ("jiski subject ye hoga X", "subject X hoga", "विषय X होगा")
+        val subjectPatterns = listOf(
+            Regex("""(?i)(?:subject|विषय|सबजेक्ट)\s*(?:ye hoga|yeh hoga|hoga|hai|hogi|rahega|rahegi|:|-|=)?\s*['"“]?([^,\n.]+?)(?:['"”]|\s*(?:aur|and|matter|विवरण|मैटर|inke naam|kiske naam|ke naam|recipient|sender|prarthi|to|from|$))"""),
+            Regex("""(?i)(?:subject|विषय|सबजेक्ट)\s*[:=]\s*([^,\n]+)""")
+        )
+        for (p in subjectPatterns) {
+            val m = p.find(prompt)
+            if (m != null) {
+                val candidate = m.groupValues[1].trim()
+                if (candidate.isNotBlank() && candidate.length > 2 && !candidate.equals("ye", true) && !candidate.equals("yeh", true)) {
+                    subject = candidate
+                    break
+                }
+            }
+        }
+
+        // 3. Matter extraction ("matter ye hoga X", "matter X hoga", "विवरण X")
+        val matterPatterns = listOf(
+            Regex("""(?i)(?:matter|विवरण|मैटर|body|content|kya likhna hai|कारण)\s*(?:ye hoga|yeh hoga|hoga|hai|rahega|:|-|=)?\s*['"“]?([^,\n]+?)(?:['"”]|\s*(?:aur|and|inke naam|kiske naam|ke naam|recipient|sender|prarthi|to|from|subject|विषय|$))"""),
+            Regex("""(?i)(?:matter|विवरण|मैटर)\s*[:=]\s*([^,\n]+)""")
+        )
+        for (p in matterPatterns) {
+            val m = p.find(prompt)
+            if (m != null) {
+                val candidate = m.groupValues[1].trim()
+                if (candidate.isNotBlank() && candidate.length > 2 && !candidate.equals("ye", true) && !candidate.equals("yeh", true)) {
+                    matter = candidate
+                    break
+                }
+            }
+        }
+
+        // 4. Sender extraction ("sender X hai", "prarthi X hai", "mera naam X hai")
+        val senderPatterns = listOf(
+            Regex("""(?i)(?:sender|prarthi|प्रार्थी|mera naam|bhejne wala|from)\s*(?:ye hoga|yeh hoga|hoga|hai|:|-|=)?\s*['"“]?([^,\n]+?)(?:['"”]|\s*(?:aur|and|matter|subject|recipient|inke naam|kiske naam|$))""")
+        )
+        for (p in senderPatterns) {
+            val m = p.find(prompt)
+            if (m != null) {
+                val candidate = m.groupValues[1].trim()
+                if (candidate.isNotBlank() && candidate.length > 1) {
+                    sender = candidate
+                    break
+                }
+            }
+        }
+
+        return ParsedUserInstructions(
+            subject = subject,
+            matter = matter,
+            recipient = recipient,
+            sender = sender
+        )
     }
 
     /**
@@ -594,19 +818,31 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
         return total > 0 && (latin.toFloat() / total > 0.35f)
     }
 
-    private fun parseLetterJson(raw: String, fallbackTopic: String, languageCode: String): Letter? {
+    private fun parseLetterJson(
+        raw: String,
+        fallbackTopic: String,
+        languageCode: String,
+        instructions: ParsedUserInstructions? = null
+    ): Letter? {
         val json = cleanAndParseJsonObject(raw) ?: return null
 
         val isHindi = languageCode.equals("hi", ignoreCase = true)
 
         val defaultTitle = if (isHindi) "औपचारिक प्रार्थना पत्र" else "Formal Application"
         val rawTitle = json.optString("title", defaultTitle)
-        val title = if (rawTitle.isBlank() || rawTitle.contains("ek letter banana hai", true) || (isHindi && isMainlyLatin(rawTitle))) defaultTitle else rawTitle
+        val title = if (rawTitle.isBlank() || rawTitle.contains("ek letter banana hai", true) || (isHindi && isMainlyLatin(rawTitle))) {
+            if (!instructions?.subject.isNullOrBlank()) sanitizeSubject(instructions!!.subject!!, languageCode) else defaultTitle
+        } else rawTitle
 
         val letterTypeStr = json.optString("letterType", "CUSTOM_LETTER")
         val toneStr = json.optString("tone", "FORMAL")
 
-        val defaultSender = if (isHindi) "[आपका नाम]\n[पता / संपर्क सूत्र]" else "[YOUR NAME]\n[ADDRESS]"
+        val userSender = instructions?.sender?.trim()
+        val defaultSender = if (isHindi) {
+            if (!userSender.isNullOrBlank()) "$userSender\n[पता / संपर्क सूत्र]" else "[आपका नाम]\n[पता / संपर्क सूत्र]"
+        } else {
+            if (!userSender.isNullOrBlank()) "$userSender\n[ADDRESS]" else "[YOUR NAME]\n[ADDRESS]"
+        }
         val senderDetails = json.optString("senderDetails", defaultSender).let {
             if (isHindi && (it.contains("[YOUR NAME]") || isMainlyLatin(it))) defaultSender else it
         }
@@ -618,10 +854,20 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
         }
         val dateStr = json.optString("dateString", todayDate)
 
+        val userRecipient = instructions?.recipient?.trim()
         val defaultRecipient = if (isHindi) {
-            "सक्षम अधिकारी महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]"
+            if (!userRecipient.isNullOrBlank()) {
+                val r = userRecipient
+                if (r.startsWith("सेवा में")) r else "सेवा में,\n$r महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]"
+            } else {
+                "सेवा में,\nसक्षम अधिकारी महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]"
+            }
         } else {
-            "The Concerned Authority,\n[ORGANIZATION / INSTITUTION NAME],\n[ADDRESS]"
+            if (!userRecipient.isNullOrBlank()) {
+                "${userRecipient},\n[ORGANIZATION / INSTITUTION NAME],\n[ADDRESS]"
+            } else {
+                "The Concerned Authority,\n[ORGANIZATION / INSTITUTION NAME],\n[ADDRESS]"
+            }
         }
         val recipientDetails = json.optString("recipientDetails", defaultRecipient).let {
             if (isHindi && (it.contains("The Concerned", true) || it.contains("[ORGANIZATION", true) || isMainlyLatin(it))) defaultRecipient else it
@@ -629,7 +875,9 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
 
         val rawSubject = json.optString("subject", "")
         var cleanSubject = sanitizeSubject(rawSubject, languageCode)
-        if (isHindi && isMainlyLatin(cleanSubject)) {
+        if (!instructions?.subject.isNullOrBlank() && (cleanSubject.isBlank() || cleanSubject.contains("आवश्यक कार्य") || isMainlyLatin(cleanSubject))) {
+            cleanSubject = sanitizeSubject(instructions!!.subject!!, languageCode)
+        } else if (isHindi && isMainlyLatin(cleanSubject)) {
             cleanSubject = if (fallbackTopic.isNotBlank()) "$fallbackTopic के संबंध में प्रार्थना पत्र" else "आवश्यक कार्य हेतु प्रार्थना पत्र"
         }
 
@@ -641,7 +889,7 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
         val rawClose = json.optString("complimentaryClose", defaultClose)
         val complimentaryClose = if (isHindi && (rawClose.contains("sincerely", true) || rawClose.contains("Yours", true) || isMainlyLatin(rawClose))) defaultClose else rawClose
 
-        val defaultSigner = if (isHindi) "[आपका नाम]" else "[YOUR NAME]"
+        val defaultSigner = if (isHindi) (userSender ?: "[आपका नाम]") else (userSender ?: "[YOUR NAME]")
         val signerName = json.optString("signerName", defaultSigner).let {
             if (isHindi && (it.contains("[YOUR NAME]") || isMainlyLatin(it))) defaultSigner else it
         }
@@ -670,15 +918,23 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
         val hasEnglishBody = isHindi && paras.any { isMainlyLatin(it) }
         val finalParas = if (paras.isEmpty() || hasEnglishBody || paras.any { it.contains("ek letter banana hai", true) }) {
             if (isHindi) {
-                // Return high-quality native Hindi paragraphs matched to the topic
-                val fallbackModel = generateHindiLetter(fallbackTopic)
+                // Return high-quality native Hindi paragraphs matched to the topic and user instructions
+                val fallbackModel = generateHindiLetter(fallbackTopic, instructions)
                 fallbackModel.bodyParagraphs
             } else {
-                listOf(
-                    "I am writing this formal application with reference to the subject mentioned above.",
-                    "Kindly look into this request with favorable consideration and advise on the next steps.",
-                    "Thank you for your valuable time and cooperation."
-                )
+                if (!instructions?.matter.isNullOrBlank()) {
+                    listOf(
+                        "I am writing this formal application with reference to the subject mentioned above.",
+                        instructions!!.matter!!,
+                        "Thank you for your valuable time and consideration."
+                    )
+                } else {
+                    listOf(
+                        "I am writing this formal application with reference to the subject mentioned above.",
+                        "Kindly look into this request with favorable consideration and advise on the next steps.",
+                        "Thank you for your valuable time and cooperation."
+                    )
+                }
             }
         } else paras
 
@@ -734,11 +990,15 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
     /**
      * Smart local rule-based letter builder with complete native Hindi & English engines
      */
-    private fun smartLocalFallback(prompt: String, languageCode: String): Letter {
+    private fun smartLocalFallback(
+        prompt: String,
+        languageCode: String,
+        instructions: ParsedUserInstructions? = null
+    ): Letter {
         val isHindi = languageCode.equals("hi", ignoreCase = true) || containsDevanagari(prompt)
 
         return if (isHindi) {
-            generateHindiLetter(prompt)
+            generateHindiLetter(prompt, instructions)
         } else {
             generateEnglishLetter(prompt)
         }
@@ -752,13 +1012,66 @@ Return ONLY a JSON object with: subject, bodyParagraphs.
     }
 
     /**
-     * Complete native formal Hindi letter generator
+     * Complete native formal Hindi letter generator adhering strictly to user directions
      */
-    private fun generateHindiLetter(prompt: String): Letter {
+    private fun generateHindiLetter(prompt: String, instructions: ParsedUserInstructions? = null): Letter {
         val lower = prompt.lowercase(Locale.ROOT)
         val cleanTopic = cleanUserConversationalFluff(prompt)
         val todayHindiDate = SimpleDateFormat("dd MMMM yyyy", Locale("hi", "IN")).format(Date())
 
+        val userSubject = instructions?.subject?.trim()
+        val userMatter = instructions?.matter?.trim()
+        val userRecipient = instructions?.recipient?.trim()
+        val userSender = instructions?.sender?.trim()
+
+        val hasExplicitDirection = !userSubject.isNullOrBlank() || !userMatter.isNullOrBlank() || !userRecipient.isNullOrBlank()
+
+        if (hasExplicitDirection) {
+            val subjectClean = if (!userSubject.isNullOrBlank()) sanitizeSubject(userSubject, "hi") else "आवश्यक कार्य हेतु प्रार्थना पत्र"
+            val recipientFormatted = if (!userRecipient.isNullOrBlank()) {
+                val r = userRecipient
+                if (r.startsWith("सेवा में")) r else "सेवा में,\n$r महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]"
+            } else {
+                "सेवा में,\nसक्षम अधिकारी महोदय,\n[संस्थान / कार्यालय का नाम],\n[स्थान / शहर]"
+            }
+            val senderFormatted = if (!userSender.isNullOrBlank()) {
+                "$userSender\n[पता / संपर्क सूत्र]"
+            } else {
+                "[आपका नाम]\n[पता / संपर्क सूत्र]"
+            }
+            val signerFormatted = if (!userSender.isNullOrBlank()) userSender else "[आपका नाम]"
+
+            val bodyParagraphs = if (!userMatter.isNullOrBlank()) {
+                listOf(
+                    "सविनय निवेदन यह है कि मैं उपरोक्त विषय के संदर्भ में यह प्रार्थना पत्र सादर प्रस्तुत कर रहा/रही हूँ।",
+                    "महोदय, मुख्य विवरण यह है कि $userMatter। अतः आपसे विनम्र प्रार्थना है कि इस प्रकरण पर सहानुभूतिपूर्वक विचार करते हुए आवश्यक कार्यवाही करने की महती कृपा करें।",
+                    "आपके बहुमूल्य समय, सहयोग एवं मार्गदर्शन के लिए मैं आपका सदैव आभारी रहूँगा/रहूँगी।"
+                )
+            } else {
+                listOf(
+                    "सविनय निवेदन यह है कि मैं उपरोक्त विषय के संदर्भ में यह प्रार्थना पत्र सादर प्रस्तुत कर रहा/रही हूँ।",
+                    "महोदय, मुझे एक आवश्यक कार्यवश यह निवेदन प्रस्तुत करना पड़ रहा है। कृपया इस प्रार्थना पत्र पर विचार करते हुए आवश्यक कार्यवाही करने की कृपा करें।",
+                    "आपके सहयोग के लिए मैं सदैव आभारी रहूँगा/रहूँगी।"
+                )
+            }
+
+            return Letter(
+                title = subjectClean,
+                letterType = LetterType.CUSTOM_LETTER,
+                tone = LetterTone.RESPECTFUL,
+                letterLanguage = "hi",
+                senderDetails = senderFormatted,
+                dateString = todayHindiDate,
+                recipientDetails = recipientFormatted,
+                subject = subjectClean,
+                salutation = "आदरणीय महोदय / महोदया,",
+                bodyParagraphs = bodyParagraphs,
+                complimentaryClose = "सधन्यवाद,\nभवदीय,",
+                signerName = signerFormatted,
+                signerDesignation = "[प्रार्थी / पद]",
+                formatting = LetterFormatOptions(isSubjectBold = true)
+            )
+        }
         // 1. Sickness / Medical / Illness
         if (lower.contains("बीमार") || lower.contains("बुखार") || lower.contains("तबीयत") ||
             lower.contains("अस्वस्थ") || lower.contains("डॉक्टर") || lower.contains("bimar") ||

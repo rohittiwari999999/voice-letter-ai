@@ -155,15 +155,16 @@ fun HomeScreen(
     }
 
     if (showContinuousVoiceModal) {
+        val isHindi = letterLang.code.equals("hi", ignoreCase = true)
         ContinuousVoiceListeningModal(
             isListening = isListening,
             rmsLevel = rmsLevel,
             liveTranscript = liveTranscript,
             languageLabel = voiceLang.fullLabel,
             errorMessage = speechError,
-            titleText = "Speak Naturally & Create Letter",
-            subtitleText = "बोलते रहिए, बीच में रुक भी सकते हैं — AI लगातार सुन रहा है। पूरा होने पर टैप करें।",
-            buttonActionLabel = "Create Letter with AI",
+            titleText = if (isHindi) "स्वाभाविक रूप से बोलें और पत्र तैयार करें" else "Speak Naturally & Create Letter",
+            subtitleText = if (isHindi) "बोलते रहिए, बीच में रुक भी सकते हैं — AI लगातार सुन रहा है। पूरा होने पर टैप करें।" else "Keep speaking, pause if needed — AI listens continuously. Tap when finished.",
+            buttonActionLabel = if (isHindi) "AI से पत्र तैयार करें" else "Create Letter with AI",
             onToggleMic = {
                 if (isListening) {
                     viewModel.speechManager.stopContinuousListening()
@@ -229,8 +230,9 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = ExecutiveNavy
                             )
+                            val isHindi = letterLang.code.equals("hi", ignoreCase = true)
                             Text(
-                                text = "Speak naturally • Instant professional letters",
+                                text = if (isHindi) "सहजता से बोलें • तुरंत पेशेवर पत्र तैयार करें" else "Speak naturally • Instant professional letters",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.Gray
                             )
@@ -312,15 +314,15 @@ fun HomeScreen(
                             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                         )
 
-                        // 🔴 PROMINENT LIVE SPEECH MONITOR BOX (Placed above so user sees spoken text live!)
+                        // 🟢 PROMINENT LIVE SPEECH MONITOR BOX (Styled in Green for Spoken Words)
                         Card(
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isListening) Color(0xFFFEF2F2) else Color(0xFFF8FAFC)
+                                containerColor = if (isListening) Color(0xFFF0FDF4) else if (liveTranscript.isNotBlank()) Color(0xFFF0FDF4) else Color(0xFFF8FAFC)
                             ),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.5.dp,
-                                if (isListening) Color(0xFFF87171) else Color(0xFFCBD5E1)
+                                if (isListening) Color(0xFF22C55E) else if (liveTranscript.isNotBlank()) Color(0xFF16A34A) else Color(0xFFCBD5E1)
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -337,17 +339,17 @@ fun HomeScreen(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isListening) Color(0xFFDC2626) else Color(0xFF16A34A))
+                                                .background(if (isListening) Color(0xFF16A34A) else Color(0xFF15803D))
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = if (isListening)
-                                                "🔴 लाइव आवाज़ टेक्स्ट (Live Speech Text):"
+                                                "🟢 लाइव आवाज़ टेक्स्ट (Live Speech Text):"
                                             else
                                                 "🎙️ बोली गई आवाज़ टेक्स्ट (Live Speech Transcript):",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isListening) Color(0xFF991B1B) else ExecutiveNavy
+                                            color = Color(0xFF15803D)
                                         )
                                     }
 
@@ -355,7 +357,8 @@ fun HomeScreen(
                                         Text(
                                             text = "साफ़ करें",
                                             fontSize = 11.sp,
-                                            color = Color.Gray,
+                                            color = Color(0xFF047857),
+                                            fontWeight = FontWeight.SemiBold,
                                             modifier = Modifier.clickable { viewModel.speechManager.clearTranscript() }
                                         )
                                     }
@@ -366,7 +369,7 @@ fun HomeScreen(
                                 Surface(
                                     color = Color.White,
                                     shape = RoundedCornerShape(8.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, PaperBorder),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (liveTranscript.isNotBlank()) Color(0xFF86EFAC) else PaperBorder),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Box(
@@ -379,32 +382,32 @@ fun HomeScreen(
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(18.dp),
                                                     strokeWidth = 2.dp,
-                                                    color = ExecutiveBlue
+                                                    color = Color(0xFF16A34A)
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = statusMessage.ifBlank { "AI पत्र तैयार कर रहा है..." },
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = ExecutiveBlue,
+                                                    color = Color(0xFF15803D),
                                                     fontWeight = FontWeight.Medium
                                                 )
                                             }
                                         } else if (liveTranscript.isNotBlank()) {
                                             Text(
                                                 text = "\"$liveTranscript\"",
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = ExecutiveNavy,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF15803D), // 🟢 Green color for live text!
                                                 lineHeight = 22.sp
                                             )
                                         } else {
                                             Text(
                                                 text = if (isListening)
-                                                    "बोलते रहिए... आपकी आवाज़ यहाँ लाइव टेक्स्ट के रूप में प्रकट होगी..."
+                                                    "बोलते रहिए... आपकी आवाज़ यहाँ तुरंत हरे लाइव टेक्स्ट में दिखेगी..."
                                                 else
                                                     "माइक दबाकर बोलें — आपकी बोली हुई स्पीच यहाँ तुरंत टेक्स्ट के रूप में लाइव दिखेगी...",
                                                 fontSize = 13.sp,
-                                                color = Color(0xFF94A3B8),
+                                                color = if (isListening) Color(0xFF16A34A) else Color(0xFF94A3B8),
                                                 lineHeight = 18.sp
                                             )
                                         }
@@ -635,13 +638,14 @@ fun HomeScreen(
                                 modifier = Modifier.size(40.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
+                            val isHindi = letterLang.code.equals("hi", ignoreCase = true)
                             Text(
-                                text = "No letters created yet",
+                                text = if (isHindi) "अभी तक कोई पत्र नहीं बनाया गया है" else "No letters created yet",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.Gray
                             )
                             Text(
-                                text = "Tap the mic above or pick a template to begin",
+                                text = if (isHindi) "शुरू करने के लिए ऊपर माइक दबाएं या कोई प्रारूप चुनें" else "Tap the mic above or pick a template to begin",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.LightGray
                             )

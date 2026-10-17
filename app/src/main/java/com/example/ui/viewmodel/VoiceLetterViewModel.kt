@@ -204,6 +204,26 @@ class VoiceLetterViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun generateProStructuredLetter(
+        subject: String,
+        matter: String,
+        recipient: String,
+        sender: String
+    ) {
+        val parts = mutableListOf<String>()
+        if (subject.isNotBlank()) parts.add("subject $subject hoga")
+        if (matter.isNotBlank()) parts.add("matter $matter hoga")
+        if (recipient.isNotBlank()) parts.add("$recipient ke naam likhna hai")
+        if (sender.isNotBlank()) parts.add("sender $sender hai")
+
+        val combined = if (parts.isNotEmpty()) {
+            "एक पत्र लिखो जिसमें " + parts.joinToString(" aur ")
+        } else {
+            "एक औपचारिक प्रार्थना पत्र"
+        }
+        generateLetterFromVoice(combined)
+    }
+
     fun loadTemplate(templateItem: TemplateItem) {
         viewModelScope.launch {
             val targetLangCode = _letterOutputLanguage.value.code

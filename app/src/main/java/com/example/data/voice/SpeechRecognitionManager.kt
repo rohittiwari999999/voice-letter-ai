@@ -137,17 +137,33 @@ class SpeechRecognitionManager(private val context: Context) {
 
     private fun extractMatches(bundle: Bundle?): List<String> {
         if (bundle == null) return emptyList()
-        val list1 = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        if (!list1.isNullOrEmpty()) return list1
 
-        val list2 = bundle.getStringArrayList(RecognizerIntent.EXTRA_RESULTS)
-        if (!list2.isNullOrEmpty()) return list2
+        // Standard speech recognizer keys
+        bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { if (it.isNotEmpty()) return it }
+        bundle.getStringArrayList(RecognizerIntent.EXTRA_RESULTS)?.let { if (it.isNotEmpty()) return it }
+        bundle.getStringArrayList("results_recognition")?.let { if (it.isNotEmpty()) return it }
+        bundle.getStringArrayList("android.speech.extra.PARTIAL_RESULTS")?.let { if (it.isNotEmpty()) return it }
+        bundle.getStringArrayList("android.speech.extra.UNCONSUMED_INPUT")?.let { if (it.isNotEmpty()) return it }
 
-        val list3 = bundle.getStringArrayList("results_recognition")
-        if (!list3.isNullOrEmpty()) return list3
+        // Array of strings fallback
+        bundle.getStringArray(SpeechRecognizer.RESULTS_RECOGNITION)?.let { if (it.isNotEmpty()) return it.toList() }
+        bundle.getStringArray(RecognizerIntent.EXTRA_RESULTS)?.let { if (it.isNotEmpty()) return it.toList() }
 
-        val list4 = bundle.getStringArrayList("android.speech.extra.UNCONSUMED_INPUT")
-        if (!list4.isNullOrEmpty()) return list4
+        // Exhaustive check across all bundle keys for any CharSequence / List / Array
+        try {
+            for (key in bundle.keySet()) {
+                val value = bundle.get(key)
+                if (value is ArrayList<*> && value.isNotEmpty()) {
+                    val strings = value.filterIsInstance<CharSequence>().map { it.toString() }
+                    if (strings.isNotEmpty()) return strings
+                } else if (value is Array<*> && value.isNotEmpty()) {
+                    val strings = value.filterIsInstance<CharSequence>().map { it.toString() }
+                    if (strings.isNotEmpty()) return strings
+                } else if (value is CharSequence && value.isNotBlank() && !key.contains("score", ignoreCase = true)) {
+                    return listOf(value.toString())
+                }
+            }
+        } catch (_: Exception) {}
 
         return emptyList()
     }

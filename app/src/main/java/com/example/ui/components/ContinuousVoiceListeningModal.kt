@@ -158,9 +158,9 @@ fun ContinuousVoiceListeningModal(
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isListening) Color(0xFFFEF2F2) else Color(0xFFF0FDF4)
+                        containerColor = Color(0xFFF0FDF4)
                     ),
-                    border = BorderStroke(1.5.dp, if (isListening) Color(0xFFF87171) else Color(0xFF86EFAC)),
+                    border = BorderStroke(1.5.dp, Color(0xFF22C55E)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
@@ -174,14 +174,14 @@ fun ContinuousVoiceListeningModal(
                                     modifier = Modifier
                                         .size(10.dp)
                                         .clip(CircleShape)
-                                        .background(if (isListening) Color(0xFFDC2626) else Color(0xFF16A34A))
+                                        .background(if (isListening) Color(0xFF16A34A) else Color(0xFF15803D))
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = if (isListening) "🔴 आप जो बोल रहे हैं (Live Speech Text):" else "🎙️ बोली गई स्पीच (Spoken Text):",
+                                    text = if (isListening) "🟢 आप जो बोल रहे हैं (Live Speech Text):" else "🎙️ बोली गई स्पीच (Spoken Text):",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isListening) Color(0xFF991B1B) else Color(0xFF166534)
+                                    color = Color(0xFF15803D)
                                 )
                             }
 
@@ -189,38 +189,39 @@ fun ContinuousVoiceListeningModal(
                                 Text(
                                     text = "${liveTranscript.length} अक्षर",
                                     fontSize = 11.sp,
-                                    color = Color.Gray
+                                    color = Color(0xFF047857),
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Large high-contrast live speech text box
+                        // Large high-contrast green live speech text box
                         OutlinedTextField(
                             value = liveTranscript,
                             onValueChange = onManualTextChange,
                             placeholder = {
                                 Text(
                                     text = if (isListening)
-                                        "बोलते रहिए... आपकी आवाज़ यहाँ तुरंत लाइव टेक्स्ट के रूप में दिखेगी...\n\n(Speaking live... Your spoken words will appear here in real time)"
+                                        "बोलते रहिए... आपकी आवाज़ यहाँ तुरंत हरे लाइव टेक्स्ट में दिखेगी...\n\n(Speaking live... Your spoken words will appear here in green text in real time)"
                                     else
                                         "माइक चालू करने के लिए नीचे माइक दबाएं या सैंपल वाक्यों पर टैप करें...\n\n(Tap mic below to speak or tap a sample phrase)",
                                     fontSize = 14.sp,
-                                    color = Color(0xFF64748B),
+                                    color = Color(0xFF059669),
                                     lineHeight = 20.sp
                                 )
                             },
                             shape = RoundedCornerShape(12.dp),
                             textStyle = MaterialTheme.typography.bodyLarge.copy(
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = ExecutiveNavy,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF15803D), // 🟢 Green color for live text!
                                 lineHeight = 22.sp
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = if (isListening) Color(0xFFDC2626) else ExecutiveBlue,
-                                unfocusedBorderColor = PaperBorder,
+                                focusedBorderColor = Color(0xFF16A34A),
+                                unfocusedBorderColor = Color(0xFF86EFAC),
                                 focusedContainerColor = Color.White,
                                 unfocusedContainerColor = Color.White
                             ),

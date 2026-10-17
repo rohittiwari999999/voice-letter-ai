@@ -320,8 +320,9 @@ fun A4DocumentCanvas(
                 // Enclosures
                 if (letter.enclosures.isNotBlank()) {
                     Spacer(modifier = Modifier.height(12.dp))
+                    val encHeader = if (isHindi) "संलग्नक (Enclosures):\n" else "Enclosures:\n"
                     Text(
-                        text = "Enclosures:\n${letter.enclosures}",
+                        text = "$encHeader${letter.enclosures}",
                         fontFamily = fontFamily,
                         fontSize = (letter.formatting.fontSizeSp - 1f).sp,
                         color = InkSecondary,
